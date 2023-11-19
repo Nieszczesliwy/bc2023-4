@@ -6,32 +6,34 @@ const port = 8000;
 
 app.get('/', (req, res) => {
     fs.readFile('data.xml', 'utf-8', (err, data) => {
-        if (err) {
-            res.status(500).send('Помилка зчитування XML файлу');
-            return;
-        }
-
-        const parser = new XMLParser();
-        let jsonData = parser.parse(data);
-
-        if (jsonData && jsonData.exchange && jsonData.exchange.currency) {
-            const currency = jsonData.exchange.currency;
-            const newXMLData = {
-                data: {
-                    exchange: {
-                        date: currency.exchangedate,
-                        rate: currency.rate
-                    }
+        try {
+            const parser = new XMLParser();
+            let jsonData = parser.parse(data);
+    
+            if (jsonData && jsonData.exchange && jsonData.exchange.currency) {
+                let currencies = jsonData.exchange.currency;
+                if (!Array.isArray(currencies)) {
+                    currencies = [currencies]; 
                 }
-            };
-
-            const builder = new XMLBuilder();
-            const xmlContent = builder.build(newXMLData);
-            res.type('application/xml');
-            res.send(xmlContent);
-        } else {
-            console.error('Invalid XML structure');
-            res.status(500).send('Невалідна структура XML');
+    
+                const newXMLData = {
+                    data: {
+                        exchange: currencies.map(cur => ({
+                            date: cur.exchangedate,
+                            rate: cur.rate
+                        }))
+                    }
+                };
+    
+                const builder = new XMLBuilder();
+                const xmlContent = builder.build(newXMLData);
+    
+                res.set('Content-Type', 'text/xml');
+                res.status(200).send(xmlContent);
+            }
+        } catch (e) {
+            console.error('Помилка зчитування XML:', e);
+            res.status(500).send('Помилка 500'); 
         }
     });
 });
